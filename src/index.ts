@@ -1,6 +1,10 @@
 import express, {Request, Response} from 'express';
 import Database from 'better-sqlite3';
 import bodyParser from 'body-parser';
+import {exec} from 'child_process';
+import {promisify} from 'util';
+
+const execAsync = promisify(exec);
 
 const app = express();
 const port = 8080;
@@ -31,8 +35,23 @@ app.get('/', (req: Request, res: Response) => {
     res.send('Working');
 });
 
-app.post('/healthz', (req: Request, res: Response) => {
-    res.send('OK');
+app.post('/healthz', async (req: Request, res: Response) => {
+    try {
+        const {stdout: psOutput} = await execAsync('ps aux | grep "myst service" | grep -v grep');
+        const isMystRunning = psOutput.trim().length > 0;
+
+        const {stdout: netstatOutput} = await execAsync('netstat -tuln | grep 4449');
+        const isPortListening = netstatOutput.trim().length > 0;
+
+        if (isMystRunning && isPortListening) {
+            res.send('OK');
+        } else {
+            res.status(500).send('Myst node is not running properly');
+        }
+    } catch (error) {
+        console.error('Health check failed:', error);
+        res.status(500).send('Health check failed');
+    }
 });
 
 app.post('/task/:roundNumber', (req: Request, res: Response) => {
