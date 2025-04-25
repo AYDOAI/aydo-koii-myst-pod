@@ -1,0 +1,26 @@
+services:
+  aydo-koii-myst-pod:
+    container_name: aydo-koii-myst-pod
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    ports:
+      - 8080:8080
+      - 4449:4449
+
+    # env_file: .env.local
+
+    volumes:
+      - /app/node_modules
+      - /app/dist
+      - ./myst-data:/var/lib/mysterium-node
+
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_ADMIN
+
+    privileged: true
+    user: root
+    network_mode: host
