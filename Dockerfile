@@ -16,15 +16,6 @@ COPY . .
 
 RUN npm run build
 
-COPY <<EOF /start-services.sh
-#!/bin/sh
-
-/usr/bin/myst --mmn.api-key=$MYST_API_KEY --vendor.id=AYDO service --agreed-terms-and-conditions &
-
-cd /app
-node dist/index.js
-EOF
-
+COPY start-services.sh /start-services.sh
 RUN chmod +x /start-services.sh
-
 CMD ["/start-services.sh"]
