@@ -19,7 +19,7 @@ RUN npm run build
 COPY <<EOF /start-services.sh
 #!/bin/sh
 
-/usr/bin/myst --mmn.api-key=sWS0Ak1G41vCrgpGuI63xTLCzQvLgc4gPuuV3fNu --vendor.id=AYDO service --agreed-terms-and-conditions &
+/usr/bin/myst --mmn.api-key=$MYST_API_KEY --vendor.id=AYDO service --agreed-terms-and-conditions &
 
 cd /app
 node dist/index.js
