@@ -16,6 +16,7 @@ COPY . .
 
 RUN npm run build
 
-COPY start-services.sh /start-services.sh
-RUN chmod +x /start-services.sh
-CMD ["/start-services.sh"]
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["node", "dist/index.js"]
