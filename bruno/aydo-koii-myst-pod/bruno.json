@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "aydo-koii-myst-pod",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

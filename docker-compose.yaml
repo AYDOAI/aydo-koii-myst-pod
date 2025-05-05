@@ -1,3 +1,5 @@
+version: '3'
+
 services:
   aydo-koii-myst-pod:
     container_name: aydo-koii-myst-pod
@@ -9,12 +11,12 @@ services:
       - 8080:8080
       - 4449:4449
 
-    # env_file: .env.local
+    env_file: .env
 
     volumes:
       - /app/node_modules
       - /app/dist
-      - ./myst-data:/var/lib/mysterium-node
+      - ./.mysterium:/root/.mysterium
 
     cap_add:
       - NET_ADMIN
@@ -24,3 +26,4 @@ services:
     privileged: true
     user: root
     network_mode: host
+    restart: unless-stopped

@@ -20,9 +20,11 @@ module.exports = {
         path: path.resolve(__dirname, 'dist'),
     },
     externals: {
-        'better-sqlite3': 'commonjs better-sqlite3',
-        express: 'commonjs express',
-        'body-parser': 'commonjs body-parser'
+        'sqlite3': 'commonjs sqlite3',
+        'express': 'commonjs express',
+        'body-parser': 'commonjs body-parser',
+        'child_process': 'commonjs child_process',
+        'util': 'commonjs util'
     },
     node: {
         __dirname: false,

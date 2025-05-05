@@ -1,34 +1,22 @@
 import express, {Request, Response} from 'express';
-import Database from 'better-sqlite3';
 import bodyParser from 'body-parser';
 import {exec} from 'child_process';
 import {promisify} from 'util';
+import {MystCliService} from './services/myst-cli.service';
+import {MystDiscoveryService} from './services/myst-discovery.service';
 
 const execAsync = promisify(exec);
+const mystService = new MystCliService();
+const discoveryService = new MystDiscoveryService();
 
 const app = express();
 const port = 8080;
-const DATABASE = "results.db";
 
 // Middleware
 app.use(bodyParser.json());
 
-// Database setup
-const db = new Database(DATABASE);
-
-// Initialize database
-db.exec(`
-    CREATE TABLE IF NOT EXISTS submissions (
-        roundNumber INTEGER PRIMARY KEY,
-        submission TEXT
-    )
-`);
-
-// Types
-interface Submission {
-    roundNumber: number;
-    submission: string;
-}
+// In-memory storage
+const submissions = new Map<number, any>();
 
 // Routes
 app.get('/', (req: Request, res: Response) => {
@@ -37,34 +25,86 @@ app.get('/', (req: Request, res: Response) => {
 
 app.post('/healthz', async (req: Request, res: Response) => {
     try {
-        const {stdout: psOutput} = await execAsync('ps aux | grep "myst service" | grep -v grep');
+        const {stdout: psOutput} = await execAsync('ps aux | grep "/usr/bin/myst" | grep -v grep');
         const isMystRunning = psOutput.trim().length > 0;
 
         const {stdout: netstatOutput} = await execAsync('netstat -tuln | grep 4449');
         const isPortListening = netstatOutput.trim().length > 0;
 
-        if (isMystRunning && isPortListening) {
-            res.send('OK');
+        const healthInfo = await mystService.getHealthInfo();
+        const isHealthInfoValid = healthInfo.version && healthInfo.uptime;
+
+        console.log('--------------------------------');
+        console.log('healthInfo:', healthInfo);
+        console.log('isMystRunning:', isMystRunning);
+        console.log('isPortListening:', isPortListening);
+        console.log('isHealthInfoValid:', isHealthInfoValid);
+        console.log('--------------------------------');
+
+        if (isMystRunning && isPortListening && isHealthInfoValid) {
+            res.json('OK');
         } else {
-            res.status(500).send('Myst node is not running properly');
+            res.status(500).json({
+                status: 'ERROR',
+                details: {
+                    isMystRunning,
+                    isPortListening,
+                    isHealthInfoValid,
+                    healthInfo
+                }
+            });
         }
     } catch (error) {
         console.error('Health check failed:', error);
-        res.status(500).send('Health check failed');
+        res.status(500).json({
+            status: 'ERROR',
+            error: 'Health check failed',
+            details: error
+        });
     }
 });
 
-app.post('/task/:roundNumber', (req: Request, res: Response) => {
+app.post('/task/:roundNumber', async (req: Request, res: Response) => {
     const roundNumber = parseInt(req.params.roundNumber);
+
+    console.log('--------------------------------');
     console.log(`Task started for round: ${roundNumber}`);
 
     try {
-        const stmt = db.prepare('INSERT OR IGNORE INTO submissions (roundNumber, submission) VALUES (?, ?)');
-        stmt.run(roundNumber, 'Hello World!');
-        res.json({roundNumber, status: 'Task started'});
+        const [providerId, services, healthInfo, nodeStatus, natInfo] = await Promise.all([
+            mystService.getProviderId(),
+            mystService.getRunningServices(),
+            mystService.getHealthInfo(),
+            mystService.getNodeStatus(),
+            mystService.getNatInfo()
+        ]);
+
+        const submission = {
+            providerId: providerId,
+            services: services,
+            uptime: healthInfo.uptime,
+            version: healthInfo.version,
+            location: nodeStatus.location,
+            ip: nodeStatus.ip,
+            monitoringStatus: natInfo.monitoringStatus,
+            natType: natInfo.natType
+        };
+
+        console.log('roundNumber:', roundNumber);
+        console.log('submission:', submission);
+
+        submissions.set(roundNumber, submission);
+        res.json({
+            roundNumber: roundNumber,
+            status: 'Task started'
+        });
     } catch (error) {
-        res.status(500).json({error: 'Database error'});
+        console.log(error);
+        console.error('Error collecting node data:', error);
+        res.status(500).json({error: 'Error collecting node data'});
     }
+
+    console.log('--------------------------------');
 });
 
 app.get('/submission/:roundNumber', (req: Request, res: Response) => {
@@ -72,23 +112,59 @@ app.get('/submission/:roundNumber', (req: Request, res: Response) => {
     console.log(`Fetching submission for round: ${roundNumber}`);
 
     try {
-        const stmt = db.prepare('SELECT * FROM submissions WHERE roundNumber = ?');
-        const result = stmt.get(roundNumber) as Submission | undefined;
-
-        if (result) {
-            res.json({message: result.submission});
+        const submission = submissions.get(roundNumber);
+        if (submission) {
+            res.json({
+                message: submission
+            });
         } else {
             res.status(404).send('Submission not found');
         }
     } catch (error) {
-        res.status(500).json({error: 'Database error'});
+        res.status(500).json({error: 'Error fetching submission'});
     }
 });
 
-app.post('/audit', (req: Request, res: Response) => {
+app.post('/audit', async (req: Request, res: Response) => {
+    console.log('--------------------------------');
     console.log('Auditing submission');
-    const auditResult = req.body.submission?.message === 'Hello World!';
-    res.json(auditResult);
+
+    try {
+        const submission = req.body.submission;
+        if (!submission || !submission.providerId) {
+            console.log('Invalid submission data');
+            return res.json(false);
+        }
+
+        console.log('Submission data:', submission);
+
+        const proposals = await discoveryService.getProposalsByProviderId(submission.providerId);
+        console.log('Proposals from discovery:', proposals);
+
+        if (!proposals || proposals.length === 0) {
+            console.log('No proposals found for provider');
+            return res.json(false);
+        }
+
+        const proposalServiceTypes = proposals.map(p => p.service_type);
+        const allServicesMatch = submission.services.every((s: string) => proposalServiceTypes.includes(s));
+        if (!allServicesMatch) {
+            console.log('Not all services from submission found in proposals');
+            return res.json(false);
+        }
+
+        const allProviderIdsMatch = proposals.every(p => p.provider_id === submission.providerId);
+        if (!allProviderIdsMatch) {
+            console.log('ProviderId mismatch in proposals');
+            return res.json(false);
+        }
+
+        res.json(true);
+    } catch (error) {
+        console.error('Error during audit:', error);
+        console.log('--------------------------------');
+        res.json(false);
+    }
 });
 
 // Start server

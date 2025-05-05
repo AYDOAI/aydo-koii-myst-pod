@@ -2,25 +2,27 @@ FROM mysteriumnetwork/myst:latest AS myst
 
 FROM node:18.18.0-alpine
 
-RUN apk add --no-cache sudo iptables python3 make gcc g++ && \
+RUN apk add --no-cache sudo iptables && \
     ln -s /sbin/iptables /usr/sbin/iptables
 
 COPY --from=myst /usr/bin/myst /usr/bin/myst
 
 WORKDIR /app
 
+COPY package*.json ./
+RUN npm install
+
 COPY . .
 
-RUN npm install
 RUN npm run build
 
 COPY <<EOF /start-services.sh
 #!/bin/sh
 
-/usr/bin/myst service --agreed-terms-and-conditions &
+/usr/bin/myst --mmn.api-key=sWS0Ak1G41vCrgpGuI63xTLCzQvLgc4gPuuV3fNu --vendor.id=AYDO service --agreed-terms-and-conditions &
 
 cd /app
-npm start
+node dist/index.js
 EOF
 
 RUN chmod +x /start-services.sh
