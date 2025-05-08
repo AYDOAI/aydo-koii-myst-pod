@@ -16,7 +16,7 @@ services:
     volumes:
       - /app/node_modules
       - /app/dist
-      - ./.mysterium:/root/.mysterium
+      # - ./.mysterium:/root/.mysterium
 
     cap_add:
       - NET_ADMIN
