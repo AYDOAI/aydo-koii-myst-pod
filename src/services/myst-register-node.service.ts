@@ -25,9 +25,7 @@ export class MystRegisterNodeService {
             }
         );
 
-        console.log(response.data);
-
-        return response.status === 201;
+        return response.status === 201 && response.data == true;
     }
 
     async registerBeneficiary(identityId: string, beneficiary: string, stake: number = 0): Promise<boolean> {
