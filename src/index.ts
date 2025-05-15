@@ -4,10 +4,12 @@ import {exec} from 'child_process';
 import {promisify} from 'util';
 import {MystCliService} from './services/myst-cli.service';
 import {MystDiscoveryService} from './services/myst-discovery.service';
+import {MystRegisterNodeService} from './services/myst-register-node.service';
 
 const execAsync = promisify(exec);
 const mystService = new MystCliService();
 const discoveryService = new MystDiscoveryService();
+const registerNodeService = new MystRegisterNodeService();
 
 const app = express();
 const port = 8080;
@@ -166,6 +168,57 @@ app.post('/audit', async (req: Request, res: Response) => {
         res.json(false);
     }
 });
+
+let registrationTriggered = false;
+let monitorInterval: NodeJS.Timeout | null = null;
+
+async function monitorAndRegisterNode() {
+    try {
+        const identityId = await registerNodeService.getIdentityId();
+        const state = await registerNodeService.getNodeState();
+
+        const identities = state?.payload?.identities || [];
+        const found = identities.find((i: any) => i.id === identityId);
+
+        if (!found) {
+            console.log(`[monitor] Identity ${identityId} not found in node state`);
+            return;
+        }
+
+        console.log(`[monitor] Identity found:`, found);
+
+        if (found.registration_status === 'Unregistered') {
+            if (!registrationTriggered) {
+                registrationTriggered = true;
+                console.log(`[monitor] Identity ${identityId} is Unregistered, running registration...`);
+                try {
+                    const result = await registerNodeService.run();
+                    console.log('[monitor] Registration result:', result);
+                } catch (err) {
+                    console.error('[monitor] Registration failed:', err);
+                }
+            } else {
+                console.log('[monitor] Registration already triggered, skipping...');
+            }
+        } else if (
+            found.registration_status === 'InProgress' ||
+            found.registration_status === 'Registered'
+        ) {
+            console.log(`[monitor] Registration status is ${found.registration_status}, stopping monitor interval.`);
+            if (monitorInterval) {
+                clearInterval(monitorInterval);
+                monitorInterval = null;
+            }
+        } else {
+            console.log(`[monitor] Identity ${identityId} status: ${found.registration_status}`);
+        }
+    } catch (err) {
+        console.error('[monitor] Error in monitorAndRegisterNode:', err);
+    }
+}
+
+monitorInterval = setInterval(monitorAndRegisterNode, 60_000);
+monitorAndRegisterNode();
 
 // Start server
 app.listen(port, '0.0.0.0', () => {

@@ -2,7 +2,7 @@ FROM mysteriumnetwork/myst:latest AS myst
 
 FROM node:18.18.0-alpine
 
-RUN apk add --no-cache sudo iptables && \
+RUN apk add --no-cache sudo iptables curl && \
     ln -s /sbin/iptables /usr/sbin/iptables
 
 COPY --from=myst /usr/bin/myst /usr/bin/myst

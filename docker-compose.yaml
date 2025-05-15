@@ -10,6 +10,7 @@ services:
     ports:
       - 8080:8080
       - 4449:4449
+      - 4050:4050
 
     env_file: .env
 

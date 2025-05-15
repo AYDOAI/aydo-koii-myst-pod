@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-/usr/bin/myst --mmn.api-key="$MYST_API_KEY" --vendor.id=AYDO service --agreed-terms-and-conditions &
+/usr/bin/myst --vendor.id=AYDO service --agreed-terms-and-conditions &
 MYST_PID=$!
 
 cleanup() {
