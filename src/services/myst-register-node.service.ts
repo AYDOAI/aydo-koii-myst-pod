@@ -1,7 +1,5 @@
 import axios from 'axios';
 
-const SENTINEL_LOGIN = process.env.SENTINEL_LOGIN;
-const SENTINEL_PASSWORD = process.env.SENTINEL_PASSWORD;
 const BENEFICIARY_WALLET = process.env.BENEFICIARY_WALLET;
 
 
@@ -15,28 +13,21 @@ export class MystRegisterNodeService {
         return response.data.id;
     }
 
-    async getAuthToken(username: string, password: string, pool: string = "external"): Promise<string> {
+    async registerIdentity(identityId: string): Promise<boolean> {
         const response = await axios.post(
-            'https://sentinel.mysterium.network/api/v1/auth/password',
-            {username, password, pool},
-            {headers: {'Content-Type': 'application/json'}}
-        );
-        return response.data.auth_token;
-    }
-
-    async registerIdentity(authToken: string, identityId: string): Promise<boolean> {
-        const response = await axios.post(
-            'https://affiliator.mysterium.network/api/v1/free-registration/partner',
-            {identity: identityId},
+            'https://cloud.aydo.ai/backend/v2/myst/register-node',
+            {identityId: identityId},
             {
                 headers: {
-                    'Authorization': `Bearer ${authToken}`,
                     'Content-Type': 'application/json'
                 },
                 validateStatus: () => true
             }
         );
-        return response.status === 200;
+
+        console.log(response.data);
+
+        return response.status === 201;
     }
 
     async registerBeneficiary(identityId: string, beneficiary: string, stake: number = 0): Promise<boolean> {
@@ -98,21 +89,17 @@ export class MystRegisterNodeService {
 
     async run(): Promise<{
         identityId: string,
-        authToken: string,
         identityRegistered: boolean,
         beneficiaryRegistered: boolean
     }> {
-        if (!SENTINEL_LOGIN || !SENTINEL_PASSWORD || !BENEFICIARY_WALLET) {
+        if (!BENEFICIARY_WALLET) {
             throw new Error('Environment variables are not set');
         }
 
         const identityId = await this.getIdentityId();
         console.log('Identity ID:', identityId);
 
-        const authToken = await this.getAuthToken(SENTINEL_LOGIN, SENTINEL_PASSWORD);
-        console.log('Auth token:', authToken);
-
-        const identityRegistered = await this.registerIdentity(authToken, identityId);
+        const identityRegistered = await this.registerIdentity(identityId);
         console.log('Identity registered:', identityRegistered);
 
         const beneficiaryRegistered = await this.registerBeneficiary(identityId, BENEFICIARY_WALLET, 0);
@@ -120,7 +107,6 @@ export class MystRegisterNodeService {
 
         return {
             identityId,
-            authToken,
             identityRegistered,
             beneficiaryRegistered
         };
