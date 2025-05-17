@@ -6,7 +6,7 @@ const BENEFICIARY_WALLET = process.env.BENEFICIARY_WALLET;
 export class MystRegisterNodeService {
     async getIdentityId(passphrase: string = ""): Promise<string> {
         const response = await axios.put(
-            'http://localhost:4050/identities/current',
+            'http://127.0.0.1:4050/identities/current',
             {passphrase},
             {headers: {'Content-Type': 'application/json'}}
         );
@@ -30,7 +30,7 @@ export class MystRegisterNodeService {
 
     async registerBeneficiary(identityId: string, beneficiary: string, stake: number = 0): Promise<boolean> {
         const response = await axios.post(
-            `http://localhost:4050/identities/${identityId}/register`,
+            `http://127.0.0.1:4050/identities/${identityId}/register`,
             {beneficiary, stake},
             {
                 headers: {'Content-Type': 'application/json'},
@@ -42,7 +42,7 @@ export class MystRegisterNodeService {
 
     async setUiPassword(username: string, oldPassword: string, newPassword: string): Promise<boolean> {
         const response = await axios.put(
-            'http://localhost:4050/auth/password',
+            'http://127.0.0.1:4050/auth/password',
             {
                 username,
                 old_password: oldPassword,
@@ -57,7 +57,7 @@ export class MystRegisterNodeService {
     }
 
     async getNodeState(): Promise<any> {
-        const response = await axios.get('http://localhost:4050/events/state', {
+        const response = await axios.get('http://127.0.0.1:4050/events/state', {
             responseType: 'stream',
             headers: {'Accept': 'text/event-stream'}
         });
