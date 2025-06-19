@@ -221,6 +221,9 @@ monitorInterval = setInterval(monitorAndRegisterNode, 60_000);
 monitorAndRegisterNode();
 
 // Start server
+console.log('ENVIRONMENT VARIABLES:');
+console.log(process.env);
+
 app.listen(port, '0.0.0.0', () => {
     console.log(`Server running on port ${port}`);
 }); 
